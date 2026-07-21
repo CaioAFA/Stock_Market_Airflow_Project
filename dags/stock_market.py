@@ -1,7 +1,11 @@
 from airflow.decorators import dag, task
 from airflow.sensors.base import PokeReturnValue
 from airflow.hooks.base import BaseHook
+from airflow.operators.python import PythonOperator
 from datetime import datetime
+from include.stock_market.tasks import _get_stock_prices, _store_prices
+
+SYMBOL = 'NVDA'
 
 
 @dag(
@@ -23,7 +27,7 @@ def stock_market():
         import requests
 
         # Conn created in Airflow admin UI
-        api = BaseHook.get_connection('stock_market')
+        api = BaseHook.get_connection('stock_api')
 
         # "extra_dejson" gets values from the JSON yo can put in the "extra"
         # field on Admin UI
@@ -39,7 +43,33 @@ def stock_market():
         )
     
 
-    is_api_available()
+    # We're using an operator because, later, we'll mix with a DockerOperator
+    # to run spark jobs. To avoid tricky dependencies, we'll use this operator
+    get_stock_prices = PythonOperator(
+        task_id='get_stock_prices',
+        
+        # Method we'll call
+        python_callable=_get_stock_prices,
+
+        # Method parameters
+        op_kwargs={
+            # Everything between "{{ }}" are evaluated at runtime.
+            # The name of this function is Templating
+            'url': '{{ ti.xcom_pull(task_ids="is_api_available") }}',
+            'symbol': SYMBOL
+        }
+    )
+
+    store_prices = PythonOperator(
+        task_id='store_prices',
+        python_callable=_store_prices,
+        op_kwargs={
+            'stock': '{{ ti.xcom_pull(task_ids="get_stock_prices") }}',
+        }
+    )
+
+
+    is_api_available() >> get_stock_prices >> store_prices
 
 
 stock_market()
