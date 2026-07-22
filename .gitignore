@@ -12,6 +12,7 @@ airflow.cfg
 airflow.db
 .astro/*.local.yml
 .astro/*.local.yaml
+.vscode
 
 # MinIO files
 include/data/minio/.minio.sys/

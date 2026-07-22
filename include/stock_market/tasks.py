@@ -1,6 +1,25 @@
 from airflow.hooks.base import BaseHook
 from minio import Minio
 from io import BytesIO
+from airflow.exceptions import AirflowNotFoundException
+
+
+BUCKET_NAME = 'stock-market'
+
+
+def _get_minio_client():
+    # "Amazon Web Services" connection type
+    # User / pwd defined in docker-compose file
+    minio = BaseHook.get_connection('minio')
+
+    client = Minio(
+        endpoint=minio.extra_dejson['endpoint_url'].split('//')[1],
+        access_key=minio.login,
+        secret_key=minio.password,
+        secure=False
+    )
+
+    return client
 
 
 def _get_stock_prices(url, symbol):
@@ -22,20 +41,10 @@ def _get_stock_prices(url, symbol):
 def _store_prices(stock):
     import json
 
-    # "Amazon Web Services" connection type
-    # User / pwd defined in docker-compose file
-    minio = BaseHook.get_connection('minio')
+    client = _get_minio_client()
 
-    client = Minio(
-        endpoint=minio.extra_dejson['endpoint_url'].split('//')[1],
-        access_key=minio.login,
-        secret_key=minio.password,
-        secure=False
-    )
-
-    bucket_name = 'stock-market'
-    if not client.bucket_exists(bucket_name):
-        client.make_bucket(bucket_name)
+    if not client.bucket_exists(BUCKET_NAME):
+        client.make_bucket(BUCKET_NAME)
 
     stock = json.loads(stock)
     symbol = stock['meta']['symbol']
@@ -44,7 +53,7 @@ def _store_prices(stock):
 
     # Check if the object was created in Minio interface
     objw = client.put_object(
-        bucket_name=bucket_name,
+        bucket_name=BUCKET_NAME,
         object_name=f'{symbol}/prices.json',
         data=BytesIO(data),
         length=len(data),
@@ -54,3 +63,18 @@ def _store_prices(stock):
     # "include/data/minio/.minio.sys/" dir
 
     return f'{objw.bucket_name}/{symbol}'
+
+
+def _get_formatted_csv(path):
+    client = _get_minio_client()
+    prefix_name = f'{path.split("/")[1]}/formatted_prices'
+    objects = client.list_objects(
+        bucket_name=BUCKET_NAME,
+        prefix=prefix_name,
+        recursive=True
+    )
+
+    for obj in objects:
+        if obj.object_name.endswith('.csv'): return obj.object_name
+
+    return Exception('The .csv file does not exist')

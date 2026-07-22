@@ -70,6 +70,14 @@ uv sync
 ```
 
 
+# Setup Airflow connections
+Take a look at the connections bellow and create on Airflow:
+```
+Connection: minio
+# TODO: insert connection details here
+
+```
+
 
 Overview
 ========
