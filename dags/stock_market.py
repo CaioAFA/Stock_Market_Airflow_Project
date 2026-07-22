@@ -2,6 +2,7 @@ from airflow.decorators import dag, task
 from airflow.sensors.base import PokeReturnValue
 from airflow.hooks.base import BaseHook
 from airflow.operators.python import PythonOperator
+from airflow.providers.docker.operators.docker import DockerOperator
 from datetime import datetime
 from include.stock_market.tasks import _get_stock_prices, _store_prices
 
@@ -68,8 +69,24 @@ def stock_market():
         }
     )
 
+    format_prices = DockerOperator(
+        task_id='format_prices',
+        image='airflow/stock-app', # Built in README setup
+        container_name='format_prices',
+        api_version='auto',
+        auto_remove='success',
+        docker_url='tcp://docker-proxy:2375', # Configured in docker-compose file
+        network_mode='container:spark-master', # The same as the "spark-master" container, defined in docker-compose
+        tty=True,
+        xcom_all=False,
+        mount_tmp_dir=False,
+        environment={
+            'SPARK_APPLICATION_ARGS': '{{ ti.xcom_pull(task_ids="store_prices") }}'
+        },
+    )
 
-    is_api_available() >> get_stock_prices >> store_prices
+
+    is_api_available() >> get_stock_prices >> store_prices >> format_prices
 
 
 stock_market()

@@ -6,5 +6,6 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "apache-airflow==2.10.5",
+    "apache-airflow-providers-docker==4.0.0",
     "minio>=7.2.20",
 ]

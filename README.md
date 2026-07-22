@@ -8,6 +8,11 @@ cd ../worker
 docker build -t airflow/spark-worker .
 
 cd ../..
+
+cd spark/notebooks/stock_transform
+docker build -t airflow/stock-app .
+
+cd ../../..
 astro dev start
 ```
 
@@ -23,6 +28,29 @@ You should see these containers running:
 If somethng isn't working properly, access one of the containers (using Docker Desktop or /bin/bash command inside them) and execute:
 ```bash
 airflow db upgrade
+```
+
+If something isn't right after restarting your environment:
+```bash
+astro dev stop
+
+# Kill all containers
+docker kill $(docker ps -q)
+
+# Kill all process using the same ports
+sudo kill -9 $(sudo lsof -t -i:2376)
+sudo kill -9 $(sudo lsof -t -i:8082)
+sudo kill -9 $(sudo lsof -t -i:9000)
+sudo kill -9 $(sudo lsof -t -i:8081)
+sudo kill -9 $(sudo lsof -t -i:8082)
+sudo kill -9 $(sudo lsof -t -i:5432)
+sudo kill -9 $(sudo lsof -t -i:7077)
+
+docker context use default
+
+astro dev start
+
+# If it's not running, try to start manually via Docker Desktop
 ```
 
 # Running / stopping
